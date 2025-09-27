@@ -1,0 +1,93 @@
+# =====================
+# Python
+# =====================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+*.egg
+dist/
+build/
+*.manifest
+*.spec
+.pytest_cache/
+
+# =====================
+# Virtual environment
+# =====================
+venv/
+.env
+.env.local
+.env.*.local
+.env.*
+.envrc
+
+# =====================
+# Logs e cache
+# =====================
+*.log
+.cache/
+logs/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# =====================
+# VSCode / IDEs
+# =====================
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# =====================
+# Ferramentas e caches
+# =====================
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# =====================
+# Cobertura de testes
+# =====================
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# =====================
+# Pip/Wheels
+# =====================
+pip-wheel-metadata/
+wheelhouse/
+
+# =====================
+# Arquivos de sistema
+# =====================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =====================
+# Dados e modelos pesados
+# =====================
+# Se você colocar os modelos Vosk na pasta recognition/
+# não é recomendado versionar arquivos grandes
+recognition/vosk-model*/
+*.wav
+*.mp3
+*.flac
+
+# =====================
+# Saída do sistema
+# =====================
+output/json/
+output/tts/
