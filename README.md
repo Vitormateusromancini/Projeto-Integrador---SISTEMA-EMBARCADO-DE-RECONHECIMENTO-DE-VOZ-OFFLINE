@@ -16,10 +16,7 @@ Os requisitos de desenvolvimento serão dividios em Hardware e Software para mel
 - Python 3.8+
 - Vosk
 - PyAudio
-- NumPy
-- Scipy
-- Librosa
-- PyYAML
+[...]
 
 ## Instalação do módulo de desenvolvimento 
 Este módulo possuí os códigos que serão jogados para o ESP32-S3 no futuro.
