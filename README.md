@@ -60,8 +60,6 @@ graph TD
     end
 ```
 
-**Correção aplicada:** ModelManager aparece como dependência usada por VoskRecognizer, não como emissor de dados.
-
 ---
 
 ## Diagrama de Classes (UML)
@@ -127,8 +125,6 @@ classDiagram
     NLPParser <.. keys : usa
 ```
 
-**Correção aplicada:** Tipo de `orig_sr` agora em sintaxe válida (`Optional[int]`) e dependência correta do ModelManager.
-
 ---
 
 ## Diagrama de Sequência: Fluxo em Tempo Real
@@ -163,8 +159,6 @@ sequenceDiagram
         end
     end
 ```
-
-**Correção aplicada:** “texto final” agora especificado como resultado final **do segmento**, não da fala inteira.
 
 ---
 
@@ -206,8 +200,6 @@ stateDiagram-v2
     EmitindoParcial --> Capturando
     EmitindoFinal --> Capturando
 ```
-
-**Correção aplicada:** Estado renomeado para **NaoVoz**, pois VAD=false nem sempre significa silêncio puro.
 
 ---
 
@@ -292,8 +284,6 @@ with audio_in.start_stream():
     result = parse_command(text)
     print(result)
 ```
-
-**Correção aplicada:** Remoção do uso incorreto de `iter(lambda: ..., None)`.
 
 ---
 
