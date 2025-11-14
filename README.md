@@ -90,8 +90,8 @@ classDiagram
       - vad: VAD
       - normalize_mode: str
       - agc: bool
-      + process_chunk_bytes(chunk: bytes, orig_sr: int?): bytes?
-      + process_stream_generator(iterable: <bytes>, orig_sr: int?): <bytes>
+      + process_chunk_bytes(chunk: bytes, orig_sr: int?): bytes
+      + process_stream_generator(iterable: bytes, orig_sr: int?): bytes
     }
 
     class VAD {
@@ -112,7 +112,7 @@ classDiagram
       - sample_rate: int
       - recognizer: KaldiRecognizer
       + recognize_chunk(chunk: bytes): str
-      + recognize_stream(audio_source: <bytes>): str
+      + recognize_stream(audio_source: bytes): str
     }
 
     class NLPParser {
