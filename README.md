@@ -15,14 +15,14 @@ O sistema opera totalmente offline e é estruturado em camadas independentes:
 * **Reconhecimento de fala (ASR)** usando modelo Vosk local.
 * **Interpretação de comandos (NLP)** em português, baseada em sinônimos, regras e composição.
 
-**Formato de dados entre módulos:**
+**Formato de dados entre módulos:**  
 PCM16 mono (bytes), com taxa de amostragem definida em `src/core/config.py`.
 
 ---
 
 ## Estrutura do Código
 
-* `src/audio/microphone.py` — `AudioInput` (stream de entrada usando sounddevice, fila de chunks).
+* `src/audio/microphone.py` — `AudioInput` (stream de entrada usando sounddevice; fila de chunks).
 * `src/audio/recorder.py` — `AudioRecorder` (consome fila do microfone).
 * `src/audio/preprocessor.py` — `AudioPreprocessor` (resample, bandpass, redução de ruído opcional, normalização, AGC, VAD, trim e framing).
 * `src/recognition/model_manager.py` — `ModelManager` (carrega `vosk.Model` localmente).
@@ -50,7 +50,7 @@ graph TD
     end
 
     VoskRecognizer -->|texto parcial/final| NLPParser
-    NLPParser -->|intent + entidades + confiança| OutputLayer[Camada de Saída/Atuadores]
+    NLPParser -->|intent + entidades + confiança| OutputLayer[Camada de Saída / Atuadores]
 
     subgraph Core
       CONFIG[(CONFIG)] --- AudioInput
@@ -71,13 +71,13 @@ classDiagram
       - samplerate: int
       - blocksize: int
       - device: int|str|None
-      + start_stream() RawInputStream
+      + start_stream(): RawInputStream
       + _callback(indata, frames, time, status)
     }
 
     class AudioRecorder {
       - audio_input: AudioInput
-      + get_next_chunk() bytes
+      + get_next_chunk(): bytes
     }
 
     class AudioPreprocessor {
@@ -90,39 +90,38 @@ classDiagram
       - vad: VAD
       - normalize_mode: str
       - agc: bool
-      + process_chunk_bytes(chunk: bytes, orig_sr: Optional[int]) bytes|None
-      + process_stream_generator(iterable, orig_sr: Optional[int]) iterable[bytes]
+      + process_chunk_bytes(chunk: bytes, orig_sr: int?): bytes?
+      + process_stream_generator(iterable: <bytes>, orig_sr: int?): <bytes>
     }
 
     class VAD {
       - sample_rate: int
       - energy_threshold: float
-      - vad: webrtcvad.Vad|None
-      + is_speech(chunk_int16: np.ndarray) bool
+      - vad: webrtcvad.Vad?
+      + is_speech(chunk_int16: np.ndarray): bool
     }
 
     class ModelManager {
       - model_path: str
-      - model: vosk.Model|None
-      + load_model() vosk.Model
+      - model: vosk.Model?
+      + load_model(): vosk.Model
     }
 
     class VoskRecognizer {
       - model: vosk.Model
       - sample_rate: int
       - recognizer: KaldiRecognizer
-      + recognize_chunk(chunk: bytes) str
-      + recognize_stream(audio_source: iterable[bytes]) str
+      + recognize_chunk(chunk: bytes): str
+      + recognize_stream(audio_source: <bytes>): str
     }
 
     class NLPParser {
-      + parse_command(text: str) dict
+      + parse_command(text: str): dict
     }
 
     AudioRecorder --> AudioInput
     AudioPreprocessor --> VAD
     VoskRecognizer ..> ModelManager
-    NLPParser <.. keys : usa
 ```
 
 ---
@@ -168,19 +167,19 @@ sequenceDiagram
 flowchart TD
     A[Texto reconhecido] --> B[_normalize]
     B --> C{Ação encontrada?}
-    C -->|não| D[Generic/Room fallback]
+    C -->|não| D[Fallback de cômodo / ação genérica]
     C -->|sim| E[_is_negated]
     D --> E
     E --> F[_apply_negation]
     F --> G{Dispositivo encontrado?}
-    G -->|não| H[generic + room composable?]
-    H -->|sim| I[monta dispositivo composável]
+    G -->|não| H[Composição genérica possível?]
+    H -->|sim| I[monta dispositivo composto]
     H -->|não| J[intent = desconhecido]
     G -->|sim| K[intent = controlar_dispositivo]
     I --> K
     J --> L[_confidence]
     K --> L[_confidence]
-    L --> M[retorna intent, entidades, confiança]
+    L --> M[retorna intent + entidades + confiança]
 ```
 
 ---
@@ -208,9 +207,9 @@ stateDiagram-v2
 * Resistência a ruído leve via redução opcional de ruído + normalização + AGC.
 * Filtro passa-faixa (80–8000 Hz, quando SciPy disponível).
 * VAD evita processar regiões sem voz, reduzindo custos e falsos positivos.
-* Vosk deve operar na taxa configurada (`CONFIG["audio"]["samplerate"]`), padrão 16 kHz.
+* Vosk deve operar na taxa configurada (`CONFIG["audio"]["samplerate"]`), padrão **16 kHz**.
 * `recognize_chunk()` retorna resultado **final do segmento** quando `AcceptWaveform()` é verdadeiro.
-* `recognize_stream()` concatena parcial + final ao longo da fala.
+* `recognize_stream()` concatena parciais + finais ao longo da fala.
 * NLP retorna estrutura:
 
 ```json
@@ -232,13 +231,15 @@ stateDiagram-v2
 
 * Python 3.8+
 * Dependências em `requirements.txt`
-* Modelo Vosk em `models/vosk-model-small-pt-0.3/` (configurável em `src/core/config.py`)
+* Modelo Vosk em `models/vosk-model-small-pt-0.3/`
+  (configurável em `src/core/config.py`)
 
 Instalação:
 
 ```bash
 python -m venv venv
-./venv/Scripts/activate
+source venv/bin/activate   # Linux/macOS
+./venv/Scripts/activate    # Windows
 pip install -r requirements.txt
 ```
 
@@ -275,7 +276,6 @@ asr = VoskRecognizer(model)
 with audio_in.start_stream():
     rec = AudioRecorder(audio_in)
 
-    # Geração contínua de chunks
     processed = pre.process_stream_generator(
         (rec.get_next_chunk() for _ in iter(int, 1))
     )
@@ -298,13 +298,13 @@ python -m pytest -v tests/
 ## Notas e Limitações
 
 * Recursos opcionais dependem de: `noisereduce`, `webrtcvad`, `scipy`.
-* Se ausentes, há fallback para implementações simplificadas (energia, sem filtro, resample básico).
+* Se ausentes, há fallback para implementações simplificadas.
 * O módulo `output` é apenas um placeholder; a integração real com atuadores depende do hardware embarcado.
 
 ---
 
 ## Licença
 
-Este projeto é acadêmico e para fins educacionais (todos os direitos reservados, exceto uso acadêmico).
+Projeto acadêmico para fins educacionais (todos os direitos reservados, exceto uso acadêmico).
 
 ---
