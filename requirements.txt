@@ -4,6 +4,8 @@
 
 sounddevice==0.5.2
 vosk==0.3.45
+numpy
+pvporcupine
 soundfile>=0.12.1
 
 #######################
