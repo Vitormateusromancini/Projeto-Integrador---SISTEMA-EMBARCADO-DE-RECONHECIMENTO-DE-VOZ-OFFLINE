@@ -6,6 +6,10 @@ class VoskRecognizer():
     def __init__(self, model):
         self.model = model
         self.sample_rate = CONFIG["audio"]["samplerate"]
+        self.reset_session()
+        print(f"VoskRecognizer inicializado em {self.sample_rate} Hz.")
+
+    def reset_session(self):
         self.recognizer = KaldiRecognizer(self.model, self.sample_rate)
 
     def recognize_chunk(self, chunk: bytes) -> str:
