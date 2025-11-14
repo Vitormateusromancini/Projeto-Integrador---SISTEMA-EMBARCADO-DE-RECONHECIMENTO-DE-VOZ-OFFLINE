@@ -37,26 +37,31 @@ PCM16 mono (bytes), com taxa de amostragem definida em `src/core/config.py`.
 
 ```mermaid
 graph TD
-    UI[Usuário/Microfone] -->|PCM16| AudioInput
+    UI[Usuário/Microfone] -->|"PCM16 (512 amostras)"| AudioInput
+    AudioInput -->|bytes| AudioRecorder
+    AudioRecorder -->|bytes| AudioPreprocessor
 
-    subgraph Audio
-      AudioInput -->|bytes| AudioRecorder
-      AudioRecorder -->|bytes| AudioPreprocessor
+    subgraph "KWS (Low Power)"
+        AudioPreprocessor -->|bytes| PorcupineRecognizer["PorcupineRecognizer (KWS)"]
     end
 
-    subgraph ASR
-      ModelManager -.-> VoskRecognizer
-      AudioPreprocessor -->|bytes| VoskRecognizer
+    PorcupineRecognizer -->|Hotword Sistema| ASR_Gate[(Ativação ASR)]
+
+    subgraph "ASR (High Power)"
+        ASR_Gate --> VoskRecognizer["VoskRecognizer (ASR)"]
+        ModelManager -.-> VoskRecognizer
+        AudioPreprocessor -->|bytes| VoskRecognizer
     end
 
-    VoskRecognizer -->|texto parcial/final| NLPParser
-    NLPParser -->|intent + entidades + confiança| OutputLayer[Camada de Saída / Atuadores]
+    VoskRecognizer -->|texto final| NLPParser
+    NLPParser -->|"intent + entidades + confiança"| OutputLayer[Camada de Saída / Relés]
 
-    subgraph Core
-      CONFIG[(CONFIG)] --- AudioInput
-      CONFIG --- AudioPreprocessor
-      CONFIG --- VoskRecognizer
-      CONFIG --- ModelManager
+    subgraph "Core"
+        CONFIG[(CONFIG)] --- AudioInput
+        CONFIG --- AudioPreprocessor
+        CONFIG --- PorcupineRecognizer
+        CONFIG --- VoskRecognizer
+        CONFIG --- ModelManager
     end
 ```
 
