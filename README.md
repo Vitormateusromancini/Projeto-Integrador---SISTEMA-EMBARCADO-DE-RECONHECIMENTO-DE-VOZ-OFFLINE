@@ -70,60 +70,59 @@ graph TD
 ## Diagrama de Classes (UML)
 
 ```mermaid
+---
+config:
+  theme: dark
+---
 classDiagram
+    class MainLoop {
+        + run_voice_assistant()
+    }
     class AudioInput {
       - q: queue.Queue
       - samplerate: int
       - blocksize: int
-      - device: int|str|None
-      + start_stream(): RawInputStream
-      + _callback(indata, frames, time, status)
+      + start_stream()
     }
-
     class AudioRecorder {
       - audio_input: AudioInput
       + get_next_chunk(): bytes
     }
-
     class AudioPreprocessor {
       - sample_rate: int
-      - do_resample: bool
-      - do_noise_reduction: bool
-      - do_bandpass: bool
-      - lowcut: float
-      - highcut: float
       - vad: VAD
-      - normalize_mode: str
-      - agc: bool
-      + process_chunk_bytes(chunk: bytes, orig_sr: int?): bytes
-      + process_stream_generator(iterable: bytes, orig_sr: int?): bytes
+      + process_chunk_bytes(bytes): bytes
     }
-
     class VAD {
-      - sample_rate: int
-      - energy_threshold: float
-      - vad: webrtcvad.Vad?
-      + is_speech(chunk_int16: np.ndarray): bool
+      + is_speech(np.ndarray): bool
     }
-
     class ModelManager {
       - model_path: str
       - model: vosk.Model?
       + load_model(): vosk.Model
     }
-
     class VoskRecognizer {
       - model: vosk.Model
-      - sample_rate: int
       - recognizer: KaldiRecognizer
-      + recognize_chunk(chunk: bytes): str
-      + recognize_stream(audio_source: bytes): str
+      + recognize_chunk(bytes): str
+      + reset_session()
     }
-
+    class PorcupineRecognizer {
+      - access_key: str
+      - model_path: str
+      - keyword_paths: list
+      - handle: pvporcupine
+      + process_chunk(bytes): int
+      + delete()
+    }
     class NLPParser {
       + parse_command(text: str): dict
     }
-
+    MainLoop --> AudioRecorder
+    MainLoop --> AudioPreprocessor
+    MainLoop --> PorcupineRecognizer
+    MainLoop --> VoskRecognizer
+    MainLoop --> NLPParser
     AudioRecorder --> AudioInput
     AudioPreprocessor --> VAD
     VoskRecognizer ..> ModelManager
