@@ -188,6 +188,7 @@ sequenceDiagram
             end
         end
     end
+```
 
 #### `_confidence(has_action: bool, has_device: bool, text: str) -> float`
 
