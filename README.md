@@ -155,37 +155,34 @@ classDiagram
 sequenceDiagram
     participant Mic as Microfone
     participant Rec as AudioRecorder
-    participant Main as Main Loop
-    participant KWS as Porcupine (KWS)
-    participant ASR as Vosk (ASR)
-    participant NLP as NLP Parser
-    participant Out as Saída/Relés
+    participant Main as MainLoop
+    participant KWS as Porcupine_KWS
+    participant ASR as Vosk_ASR
+    participant NLP as NLP_Parser
+    participant Out as Saida
 
-    Note over Main: Estado: KWS_Listening (Low Power)
+    Note over Main: Estado inicial: KWS_Listening (Low Power)
 
     loop Monitoramento
-        Mic->>Rec: PCM16 (512 samples)
+        Mic->>Rec: PCM16 (512 amostras)
         Rec->>Main: get_next_chunk()
         Main->>KWS: process_chunk(bytes)
         KWS-->>Main: index (-1 ou 0)
 
-        alt Hotword "Sistema" Detectada
+        alt Hotword "Sistema" detectada
             Main->>ASR: reset_session()
             Note over Main: Estado: ASR_Active (High Power)
-            
-            loop Transcrição de Comando
-                Rec->>Main: get_next_chunk()
-                Main->>ASR: recognize_chunk(bytes)
-                
-                alt AcceptWaveform == true
-                    ASR-->>Main: Texto Final (JSON)
-                    Main->>NLP: parse_command(texto)
-                    NLP-->>Main: Intent + Entidades
-                    Main->>Out: Acionar Hardware
-                    Note over Main: Retorna para KWS_Listening
-                else
-                    ASR-->>Main: Parcial (opcional)
-            end
+
+            Rec->>Main: get_next_chunk() (fala do usuário)
+            Main->>ASR: recognize_chunk(bytes)
+            ASR-->>Main: Texto Final (JSON)
+
+            Main->>NLP: parse_command(texto)
+            NLP-->>Main: Intent + Entidades
+            Main->>Out: Acionar Hardware
+            Note over Main: Volta para KWS_Listening
+        else Nenhuma hotword
+            Note over Main: Permanece em KWS_Listening
         end
     end
 ```
