@@ -1,18 +1,4 @@
 """
-
-
-
-
-
-
-
-Todo este código foi gerado pelo GPT, então ira sofrer mudanças
-
-
-
-
-
-
 src/audio/preprocessor.py
 
 Preprocessor de áudio completo para o pipeline:
