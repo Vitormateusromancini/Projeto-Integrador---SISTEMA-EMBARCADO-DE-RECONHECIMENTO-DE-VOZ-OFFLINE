@@ -185,18 +185,9 @@ sequenceDiagram
                     Note over Main: Retorna para KWS_Listening
                 else
                     ASR-->>Main: Parcial (opcional)
-
-- Recebe a ação já identificada (ex.: `"ligar"`) e o sinal de negação.
-- Se estiver negado e existir um mapeamento em `NEGATION_INVERT`, inverte a ação:
-  - `"nao ligar a luz"` → ação vira `"desligar"`.
-- Se não houver inverso definido, mantém a ação original.
-
-#### `_extract_value(text: str) -> Optional[tuple[float, str]]`
-
-- Extrai **valores numéricos** do texto, com foco em:
-  - Percentuais: `"50%"`, `"50 %"` → `(50.0, "%")` (clamp entre 0 e 100).
-  - Temperatura: `"22 graus"`, `"22c"`, `"22 °c"` → `(22.0, "graus")`.
-- Retorna `(valor, unidade)` ou `None` se nada for encontrado.
+            end
+        end
+    end
 
 #### `_confidence(has_action: bool, has_device: bool, text: str) -> float`
 
