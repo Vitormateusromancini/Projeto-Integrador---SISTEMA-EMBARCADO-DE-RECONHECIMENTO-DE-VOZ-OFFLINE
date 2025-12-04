@@ -1,6 +1,6 @@
 # Sistema Embarcado de Reconhecimento de Voz Offline
 
-Documentação do projeto integrador (Engenharia de Computação – UFSM) para um pipeline completo de reconhecimento de voz offline, com captura de áudio, pré-processamento, ASR com Vosk e interpretação de comandos (NLP) baseada em regras.
+Documentação do projeto integrador (Engenharia de Computação – UFSM) para um pipeline completo de reconhecimento de voz offline, com captura de áudio, pré-processamento, ASR com Vosk e interpretação de comandos (NLP) baseada em regras integrando **Detecção de Hotword (KWS)** de baixo consumo.
 
 Esta documentação descreve a arquitetura, componentes, fluxos internos, comportamento esperado do sistema e diagramas UML em Mermaid.
 
@@ -8,15 +8,33 @@ Esta documentação descreve a arquitetura, componentes, fluxos internos, compor
 
 ## Visão Geral do Sistema
 
-O sistema opera totalmente offline e é estruturado em camadas independentes:
+O sistema opera totalmente offline e utiliza uma **arquitetura híbrida de ativação por voz** para otimizar o consumo de processamento:
 
 * **Captura de áudio** em tempo real.
-* **Pré-processamento** (normalização, redução de ruído, filtro passa-faixa, VAD, trim de silêncio).
-* **Reconhecimento de fala (ASR)** usando modelo Vosk local.
+* **Detecção de Hotword (KWS)**: Camada de baixo consumo (*Low Power*) que monitora continuamente o áudio em busca da palavra-gatilho **"Sistema"** (usando Picovoice Porcupine).
+* **Reconhecimento de fala (ASR)**: Camada de alto desempenho (*High Power*) usando modelo Vosk local, ativada **apenas** quando a hotword é detectada.
+* **Pré-processamento** (normalização, VAD e adaptação de buffers).
 * **Interpretação de comandos (NLP)** em português, baseada em sinônimos, regras e composição.
+
+**Formato de dados entre módulos:** PCM16 mono (bytes), com taxa de amostragem de 16kHz e tamanho de bloco fixo de **512 amostras** (requisito de sincronia do módulo KWS).
 
 **Formato de dados entre módulos:**  
 PCM16 mono (bytes), com taxa de amostragem definida em `src/core/config.py`.
+
+## Módulo de Detecção de Hotword (KWS)
+
+Esta é a camada de entrada do sistema, responsável pela eficiência energética.
+
+### Tecnologia e Arquitetura
+O módulo utiliza o motor **Picovoice Porcupine**, que permite processamento *on-device* com latência mínima.
+* **Estado KWS:** Monitora o áudio continuamente.
+* **Gatilho:** A detecção da palavra "Sistema" dispara a transição de estado no orquestrador (`main.py`).
+
+### Detalhes de Implementação Técnica
+A integração exigiu alterações estruturais no pipeline de áudio:
+* **Sincronia de Áudio:** O `BLOCKSIZE` em `src/core/config.py` foi fixado em **512 amostras** para atender aos requisitos de frame do Porcupine.
+* **Compatibilidade de Idioma:** Implementação do carregamento explícito do modelo de idioma Português (`porcupine_params_pt.pv`) juntamente com o modelo da palavra-chave (`sistema_pt.ppn`) para evitar conflitos de localidade.
+* **Ponte KWS ↔ ASR:** Implementação do método `reset_session()` no `VoskRecognizer` para limpar o buffer de áudio na transição de estados, evitando a transcrição duplicada da hotword.
 
 ---
 
