@@ -40,14 +40,15 @@ A integração exigiu alterações estruturais no pipeline de áudio:
 
 ## Estrutura do Código
 
-* `src/audio/microphone.py` — `AudioInput` (stream de entrada usando sounddevice; fila de chunks).
-* `src/audio/recorder.py` — `AudioRecorder` (consome fila do microfone).
-* `src/audio/preprocessor.py` — `AudioPreprocessor` (resample, bandpass, redução de ruído opcional, normalização, AGC, VAD, trim e framing).
-* `src/recognition/model_manager.py` — `ModelManager` (carrega `vosk.Model` localmente).
-* `src/recognition/vosk_recognizer.py` — `VoskRecognizer` (ASR por chunk ou stream).
-* `src/nlp/keys.py` — dicionários de sinônimos e regras (ações, dispositivos, cômodos, negação, composição).
-* `src/nlp/nlp.py` — parser de comandos (`parse_command`).
-* `src/core/config.py` — `CONFIG` (parâmetros de áudio e caminho do modelo Vosk).
+* `src/core/config.py` — `CONFIG` (Parâmetros de áudio, chaves de acesso Picovoice, caminhos dos modelos e tamanho de bloco fixo de 512 amostras).
+* `src/audio/microphone.py` — `AudioInput` (Stream de entrada usando `sounddevice`, configurado para a latência exigida pelo KWS).
+* `src/audio/recorder.py` — `AudioRecorder` (Consome fila do microfone).
+* `src/audio/preprocessor.py` — `AudioPreprocessor` (Resample, normalização e VAD).
+* **`src/recognition/porcupine_recognizer.py`** — **`PorcupineRecognizer`** (módulo KWS que encapsula a biblioteca Picovoice para detectar a hotword "Sistema").
+* `src/recognition/vosk_recognizer.py` — `VoskRecognizer` (Motor ASR; inclui o método `reset_session` para limpar o buffer na transição de estados).
+* `src/recognition/model_manager.py` — `ModelManager` (Carrega `vosk.Model` localmente).
+* `src/nlp/keys.py` — Dicionários de sinônimos e regras (ações, dispositivos, cômodos, negação, composição).
+* `src/nlp/nlp.py` — Parser de comandos (`parse_command`).
 
 ---
 
@@ -153,35 +154,42 @@ classDiagram
 ```mermaid
 sequenceDiagram
     participant Mic as Microfone
-    participant In as AudioInput
     participant Rec as AudioRecorder
-    participant Pre as AudioPreprocessor
-    participant MM as ModelManager
-    participant ASR as VoskRecognizer
+    participant Main as Main Loop
+    participant KWS as Porcupine (KWS)
+    participant ASR as Vosk (ASR)
     participant NLP as NLP Parser
-    participant Out as Saída/Atuadores
+    participant Out as Saída/Relés
 
-    Mic->>In: amostras PCM16
-    In->>Rec: enqueue bytes
+    Note over Main: Estado: KWS_Listening (Low Power)
 
-    loop stream
-        Rec->>Pre: next chunk (bytes)
-        Pre->>Pre: resample/bandpass/NR/normalize/AGC/VAD/trim
-        Pre-->>ASR: bytes processados
+    loop Monitoramento
+        Mic->>Rec: PCM16 (512 samples)
+        Rec->>Main: get_next_chunk()
+        Main->>KWS: process_chunk(bytes)
+        KWS-->>Main: index (-1 ou 0)
 
-        alt AcceptWaveform == true
-            ASR->>ASR: Result()
-            ASR-->>NLP: texto final (segmento)
-            NLP->>NLP: parse_command()
-            NLP-->>Out: intent + entidades + confiança
-        else
-            ASR->>ASR: PartialResult()
-            ASR-->>NLP: texto parcial (opcional)
+        alt Hotword "Sistema" Detectada
+            Main->>ASR: reset_session()
+            Note over Main: Estado: ASR_Active (High Power)
+            
+            loop Transcrição de Comando
+                Rec->>Main: get_next_chunk()
+                Main->>ASR: recognize_chunk(bytes)
+                
+                alt AcceptWaveform == true
+                    ASR-->>Main: Texto Final (JSON)
+                    Main->>NLP: parse_command(texto)
+                    NLP-->>Main: Intent + Entidades
+                    Main->>Out: Acionar Hardware
+                    Note over Main: Retorna para KWS_Listening
+                else
+                    ASR-->>Main: Parcial (opcional)
+                end
+            end
         end
     end
 ```
-
----
 
 ## Diagrama de Atividade: Interpretação de Comandos (NLP)
 
@@ -204,22 +212,40 @@ flowchart TD
     L --> M[retorna intent + entidades + confiança]
 ```
 
----
 
 ## Diagrama de Estados: Comportamento do Reconhecedor
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Idle
-    Idle --> Capturando: start_stream()
-    Capturando --> Processando: novo chunk
-    Processando --> NaoVoz: VAD == false
-    Processando --> Reconhecendo: VAD == true
-    NaoVoz --> Capturando: próximo chunk
-    Reconhecendo --> EmitindoParcial: AcceptWaveform == false
-    Reconhecendo --> EmitindoFinal: AcceptWaveform == true
-    EmitindoParcial --> Capturando
-    EmitindoFinal --> Capturando
+    [*] --> KWS_Listening
+    
+    state "KWS_Listening (Low Power)" as KWS_Listening {
+        [*] --> Monitorando
+        Monitorando --> Monitorando : Chunk (512 amostras)
+        Monitorando --> Detectado : Hotword "Sistema"
+    }
+
+    KWS_Listening --> ASR_Active : Detectado / reset_session()
+
+    state "ASR_Active (High Power)" as ASR_Active {
+        [*] --> CapturandoVoz
+        CapturandoVoz --> ProcessandoVAD : Chunk de Áudio
+        ProcessandoVAD --> CapturandoVoz : Fala Detectada
+        ProcessandoVAD --> VerificandoTimeout : Silêncio
+        VerificandoTimeout --> CapturandoVoz : < 3 segundos
+        VerificandoTimeout --> Timeout : >= 3 segundos
+        CapturandoVoz --> ResultadoFinal : Frase Completa
+    }
+
+    ASR_Active --> NLP_Processing : ResultadoFinal
+    ASR_Active --> KWS_Listening : Timeout
+
+    state "NLP & Execução" as NLP_Processing {
+        [*] --> Parse
+        Parse --> Acao : Intent Identificada
+    }
+
+    NLP_Processing --> KWS_Listening : Comando Executado
 ```
 
 ---
@@ -229,6 +255,8 @@ stateDiagram-v2
 * Resistência a ruído leve via redução opcional de ruído + normalização + AGC.
 * Filtro passa-faixa (80–8000 Hz, quando SciPy disponível).
 * VAD evita processar regiões sem voz, reduzindo custos e falsos positivos.
+* **Detecção de Hotword ("Sistema")** mantém o ASR em espera, ativando o reconhecimento apenas quando necessário.
+* **Processamento em chunks de 512 amostras** para compatibilidade estrita com o motor de Hotword.
 * Vosk deve operar na taxa configurada (`CONFIG["audio"]["samplerate"]`), padrão **16 kHz**.
 * `recognize_chunk()` retorna resultado **final do segmento** quando `AcceptWaveform()` é verdadeiro.
 * `recognize_stream()` concatena parciais + finais ao longo da fala.
@@ -254,6 +282,7 @@ stateDiagram-v2
 * Python 3.8+
 * Dependências em `requirements.txt`
 * Modelo Vosk em `models/vosk-model-small-pt-0.3/`
+* Modelos Picovoice em `models/picovoice/`
   (configurável em `src/core/config.py`)
 
 Instalação:
@@ -270,6 +299,7 @@ Estrutura mínima:
 ```
 models/
   vosk-model-small-pt-0.3/
+  picovoice/
 src/
   audio/
   core/
