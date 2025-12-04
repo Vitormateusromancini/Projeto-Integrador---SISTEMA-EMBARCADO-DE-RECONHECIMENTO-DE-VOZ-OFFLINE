@@ -185,13 +185,83 @@ sequenceDiagram
                     Note over Main: Retorna para KWS_Listening
                 else
                     ASR-->>Main: Parcial (opcional)
-                end
-            end
-        end
-    end
+
+- Recebe a ação já identificada (ex.: `"ligar"`) e o sinal de negação.
+- Se estiver negado e existir um mapeamento em `NEGATION_INVERT`, inverte a ação:
+  - `"nao ligar a luz"` → ação vira `"desligar"`.
+- Se não houver inverso definido, mantém a ação original.
+
+#### `_extract_value(text: str) -> Optional[tuple[float, str]]`
+
+- Extrai **valores numéricos** do texto, com foco em:
+  - Percentuais: `"50%"`, `"50 %"` → `(50.0, "%")` (clamp entre 0 e 100).
+  - Temperatura: `"22 graus"`, `"22c"`, `"22 °c"` → `(22.0, "graus")`.
+- Retorna `(valor, unidade)` ou `None` se nada for encontrado.
+
+#### `_confidence(has_action: bool, has_device: bool, text: str) -> float`
+
+- Calcula uma confiança heurística acumulando pontos:
+  - +0.5 se encontrou uma **ação**.
+  - +0.4 se encontrou um **dispositivo**.
+  - +0.05 se encontra palavras de cortesia / reforço ("por favor", "agora", "imediatamente"...).
+  - +0.05 se identifica formas verbais típicas de comando ("abra", "feche", "ligue"...).
+  - +0.05 se há valor numérico com `%` ou graus.
+  - +0.05 se foi identificado um **cômodo**.
+- O valor final é **limitado entre 0.0 e 1.0**.
+
+### Função Principal: `parse_command(text: str) -> Dict[str, Any]`
+
+Esta é a função de alto nível usada pelo restante do sistema. Fluxo simplificado:
+
+1. **Normalização do texto**
+   - `norm = _normalize(text)`
+   - Torna o texto adequado para buscas por sinônimos.
+2. **Identificação de ação e dispositivo específicos**
+   - `action = _find_best_match(norm, ACTIONS)`
+   - `device = _find_best_match(norm, DEVICES)`
+   - Marca `has_action` e `has_device` com base nos resultados.
+3. **Tratamento de negação**
+   - `neg = _is_negated(" " + norm + " ")` (adiciona espaços para facilitar regex).
+   - Extrai `action_key` da tupla de ação (se houver) e chama `_apply_negation`.
+4. **Fallback para dispositivos genéricos + cômodo**
+   - Se nenhum dispositivo específico for encontrado:
+     - Busca um **dispositivo genérico** com `_find_generic_device` (ex.: `"luz"`).
+     - Busca um **cômodo** com `_find_room` (ex.: `"sala"`).
+     - Se o genérico estiver em `COMPOSABLE` e houver cômodo, compõe uma chave como `"luz_sala"`.
+5. **Definição da intent**
+   - Se houver ação e dispositivo válidos, usa `INTENT_DEFAULT` (ex.: `"controlar_dispositivo"`).
+   - Caso contrário, define intent como `"desconhecido"`.
+6. **Montagem do resultado base**
+   - Estrutura retornada:
+   - `"intent"`: string com o nome da intent.
+   - `"entities"`: dicionário com pelo menos:
+     - `"acao"`: chave normalizada da ação (ou `None`).
+     - `"dispositivo"`: chave normalizada do dispositivo (ou `None`).
+   - `"confidence"`: valor float calculado por `_confidence`.
+7. **Enriquecimento com valor numérico**
+   - Chama `_extract_value(norm)`.
+   - Se houver resultado, adiciona em `entities`:
+     - `"valor"`: número extraído.
+     - `"unidade"`: `%` ou `"graus"`.
+8. **Retorno final**
+   - Retorna o dicionário completo, pronto para ser consumido pela camada de saída / automação.
+
+Exemplo de saída típica:
+
+```json
+{
+  "intent": "controlar_dispositivo",
+  "entities": {
+    "acao": "ligar",
+    "dispositivo": "luz_sala",
+    "valor": 50.0,
+    "unidade": "%"
+  },
+  "confidence": 0.95
+}
 ```
 
-## Diagrama de Atividade: Interpretação de Comandos (NLP)
+### Diagrama de Atividade: Interpretação de Comandos (NLP)
 
 ```mermaid
 flowchart TD
@@ -212,6 +282,7 @@ flowchart TD
     L --> M[retorna intent + entidades + confiança]
 ```
 
+---
 
 ## Diagrama de Estados: Comportamento do Reconhecedor
 
