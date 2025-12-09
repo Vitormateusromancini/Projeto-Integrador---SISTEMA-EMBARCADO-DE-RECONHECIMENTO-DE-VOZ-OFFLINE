@@ -2,7 +2,7 @@ import unicodedata
 import re
 import json
 from typing import Dict, Any, Optional
-from keys import *
+from .keys import *
 
 def _normalize(text: str) -> str:
     text = text.lower().strip()
