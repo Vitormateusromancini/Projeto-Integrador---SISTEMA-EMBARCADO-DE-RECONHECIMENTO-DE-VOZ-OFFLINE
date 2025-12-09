@@ -9,7 +9,7 @@ MODELS_DIR = os.path.join(BASE_DIR, 'models')
 CONFIG = {
     # --- Configurações de Áudio ---
     "audio": {
-        "samplerate": 16000,
+        "samplerate": 8000,
         "blocksize": 512,  # Valor estático (requerido pelo Porcupine)
         "device": 0,
     },
